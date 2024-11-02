@@ -48,11 +48,33 @@ class Command(BaseCommand):
                     branch.name,
                     tuple(arg.arg for arg in branch.args.args),
                 )
-                if branch.body:
-                    # TODO: find a way to readable return in here
-                    print('Return:', ast.dump(branch.body[0].value), '\n')
+                if body := branch.body:
+                    # Get docstrings
+
+                    # Get calls
+
+                    # Get validation statements
+
+                    # Get return points
+                    for item in body:
+                        self.get_function_return(item)
 
         return mermaid_code
+
+    def get_function_return(self, item):
+        if isinstance(item, ast.Return):
+            print(
+                'Return:',
+                f'{item.value.func.id}{self.get_function_params(item.value.args)}'
+                if hasattr(item.value, 'func')
+                else f'{item.value.id}{self.get_function_params(item.value.args)}',
+                '\n',
+            )
+
+    def get_function_params(self, args):
+        return tuple(name.id for name in args if hasattr(name, 'id')) + tuple(
+            name.value for name in args if hasattr(name, 'value')
+        )
 
     def main(self):
         """Generate MermaidJS diagrams for specified Python files.
