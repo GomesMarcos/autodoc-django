@@ -17,15 +17,28 @@
         },
         // Debug autodoc command
         {
-            "name": "Autodoc",
+            "name": "Autodoc Flow",
             "type": "debugpy",
             "request": "launch",
             "args": [
-                "autodoc"
+                "autodoc_flow",
+                "app",
             ],
             "django": true,
             "autoStartBrowser": false,
             "program": "${workspaceFolder}/manage.py"
-        }
+        },
+        {
+            "name": "Autodoc Sequence",
+            "type": "debugpy",
+            "request": "launch",
+            "args": [
+                "autodoc_sequence",
+                "app",
+            ],
+            "django": true,
+            "autoStartBrowser": false,
+            "program": "${workspaceFolder}/manage.py"
+        },
     ]
 }
