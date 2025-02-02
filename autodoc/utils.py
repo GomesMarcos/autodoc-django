@@ -4,7 +4,7 @@ from typing import List
 from django.core.management.base import BaseCommand
 
 
-class AutodocUtils(BaseCommand):
+class AutodocCommandUtils(BaseCommand):
     """
     Classe utilitária para gerar diagramas de classes e funções.
     """
