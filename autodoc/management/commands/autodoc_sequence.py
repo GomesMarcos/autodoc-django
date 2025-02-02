@@ -3,14 +3,21 @@ import os
 from typing import List
 
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
+
+from autodoc.utils import AutodocCommandUtils
 
 
-class Command(BaseCommand):
-    help = "Gera documentação automática em formato MermaidJS para views, admins e tasks Celery de apps Django"
+class Command(AutodocCommandUtils):
+    help = 'Gera documentação automática em formato MermaidJS para views, admins e tasks Celery de apps Django'
 
     def add_arguments(self, parser):
-        parser.add_argument('app_names', nargs='+', type=str, help='Nome dos apps Django para documentar')
+        parser.add_argument(
+            'app_names',
+            nargs='+',
+            type=str,
+            help='Nome dos apps Django para documentar',
+        )
 
     def handle(self, *args, **options):
         for app_name in options['app_names']:
@@ -52,55 +59,65 @@ class Command(BaseCommand):
         """Gera diagrama de sequência Mermaid para views."""
         tree = self.parse_file(filename)
 
-        mermaid_code = ["sequenceDiagram"]
-
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
+                mermaid_code = ['sequenceDiagram']
                 # Identifica views baseadas em classes
                 bases = [base.id for base in node.bases if isinstance(base, ast.Name)]
                 if any(base.endswith('View') for base in bases):
                     view_name = node.name
 
-                    # Adiciona participantes
-                    mermaid_code.append(f"    participant Client")
-                    mermaid_code.append(f"    participant {view_name}")
-
+                    mermaid_code.extend(
+                        ('    participant Client', f'    participant {view_name}')
+                    )
                     for item in node.body:
                         if isinstance(item, ast.FunctionDef):
-                            if item.name in ['get', 'post', 'put', 'delete']:
-                                # Adiciona a chamada do método
-                                mermaid_code.append(f"    Client->>+{view_name}: {item.name}()")
+                            mermaid_code.append(
+                                f'    Client->>+{view_name}: {item.name}()'
+                            )
 
-                                # Analisa o corpo do método
-                                self._analyze_sequence_body(item.body, view_name, mermaid_code)
+                            # Analisa o corpo do método
+                            self._analyze_sequence_body(
+                                item.body, view_name, mermaid_code
+                            )
 
-                                # Fecha a chamada do método
-                                mermaid_code.append(f"    {view_name}-->>-Client: response")
+                            # Fecha a chamada do método
+                            mermaid_code.append(f'    {view_name}-->>-Client: response')
 
-        self.save_mermaid_diagram(mermaid_code, f"{app_name}_views")
+                self.save_mermaid_diagram(mermaid_code, f'{app_name}_views_{node.name}')
 
-    def _analyze_sequence_body(self, body, participant: str, mermaid_code: List[str], depth: int = 0):
+    def _analyze_sequence_body(
+        self, body, participant: str, mermaid_code: List[str], depth: int = 0
+    ):
         """Analisa o corpo de um método para o diagrama de sequência."""
         for stmt in body:
             if isinstance(stmt, ast.If):
                 condition = self._get_condition_text(stmt.test)
-                mermaid_code.append(f"    Note over {participant}: if {condition}")
-                self._analyze_sequence_body(stmt.body, participant, mermaid_code, depth + 1)
+                mermaid_code.append(f'    Note over {participant}: if {condition}')
+                self._analyze_sequence_body(
+                    stmt.body, participant, mermaid_code, depth + 1
+                )
 
                 if stmt.orelse:
-                    mermaid_code.append(f"    Note over {participant}: else")
-                    self._analyze_sequence_body(stmt.orelse, participant, mermaid_code, depth + 1)
+                    mermaid_code.append(f'    Note over {participant}: else')
+                    self._analyze_sequence_body(
+                        stmt.orelse, participant, mermaid_code, depth + 1
+                    )
 
             elif isinstance(stmt, ast.Call):
                 target = self._get_call_target(stmt)
                 if target != participant:  # Evita mostrar chamadas internas
-                    mermaid_code.append(f"    {participant}->>+{target}: {self._get_call_text(stmt)}")
-                    mermaid_code.append(f"    {target}-->>-{participant}: response")
+                    mermaid_code.append(
+                        f'    {participant}->>+{target}: {self._get_call_text(stmt)}'
+                    )
+                    mermaid_code.append(f'    {target}-->>-{participant}: response')
 
             elif isinstance(stmt, ast.Return):
                 return_text = self._get_return_text(stmt)
                 if return_text:
-                    mermaid_code.append(f"    Note over {participant}: return {return_text}")
+                    mermaid_code.append(
+                        f'    Note over {participant}: return {return_text}'
+                    )
 
     def _get_call_target(self, call) -> str:
         """Extrai o alvo da chamada de função."""
@@ -111,7 +128,7 @@ class Command(BaseCommand):
                 return call.func.value.id
             elif isinstance(call.func.value, ast.Call):
                 return self._get_call_target(call.func.value)
-        return "External"
+        return 'External'
 
     def _get_condition_text(self, test) -> str:
         """Extrai o texto da condição."""
@@ -119,18 +136,32 @@ class Command(BaseCommand):
             left = self._get_name(test.left)
             op = self._get_operator(test.ops[0])
             right = self._get_name(test.comparators[0])
-            return f"{left} {op} {right}"
+            return f'{left} {op} {right}'
         elif isinstance(test, ast.Name):
             return test.id
-        return "condition"
+        elif isinstance(test, ast.Attribute):
+            return f'{self._get_name(test.value)}.{test.attr}'
+
+        return 'condition'
 
     def _get_call_text(self, call) -> str:
         """Extrai o texto da chamada de função."""
         if isinstance(call.func, ast.Name):
-            return f"{call.func.id}()"
+            return f'{call.func.id}()'
         elif isinstance(call.func, ast.Attribute):
-            return f"{self._get_name(call.func.value)}.{call.func.attr}()"
-        return "function_call"
+            return f'{self._get_name(call.func.value)}.{call.func.attr}()'
+        return 'function_call'
+
+    def _get_name(self, node) -> str:
+        """Extrai o nome de um nó AST."""
+        if isinstance(node, ast.Name):
+            return node.id
+        elif isinstance(node, ast.Attribute):
+            return f'{self._get_name(node.value)}.{node.attr}'
+        elif isinstance(node, ast.Call):
+            node_args = ','.join([self._get_name(arg) for arg in node.args])
+            return f'{self._get_name(node.func)}({node_args}).{node.args[0].id}'
+        return str(node)
 
     def _get_return_text(self, ret) -> str:
         """Extrai o texto do return."""
@@ -138,13 +169,17 @@ class Command(BaseCommand):
             return ret.value.id
         elif isinstance(ret.value, ast.Call):
             return self._get_call_text(ret.value)
-        return ""
+        return ''
 
     def generate_admin_diagram(self, filename: str, app_name: str):
         """Gera diagrama de sequência Mermaid para classes Admin."""
         tree = self.parse_file(filename)
 
-        mermaid_code = ["sequenceDiagram"]
+    def generate_admin_diagram(self, filename: str, app_name: str):
+        """Gera diagrama de sequência Mermaid para classes Admin."""
+        tree = self.parse_file(filename)
+
+        mermaid_code = ['sequenceDiagram']
 
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
@@ -152,79 +187,102 @@ class Command(BaseCommand):
                 if 'ModelAdmin' in bases:
                     admin_name = node.name
 
-                    # Adiciona participantes
-                    mermaid_code.append(f"    participant User")
-                    mermaid_code.append(f"    participant {admin_name}")
-                    mermaid_code.append(f"    participant Database")
-
+                    mermaid_code.extend(
+                        '    participant User',
+                        f'    participant {admin_name}',
+                        '    participant Database',
+                    )
                     # Adiciona configurações do admin como notas
                     for item in node.body:
                         if isinstance(item, ast.Assign):
                             if isinstance(item.targets[0], ast.Name):
                                 attr_name = item.targets[0].id
-                                if attr_name in ['list_display', 'search_fields', 'list_filter']:
-                                    mermaid_code.append(f"    Note over {admin_name}: {attr_name}")
+                                if attr_name in [
+                                    'list_display',
+                                    'search_fields',
+                                    'list_filter',
+                                ]:
+                                    mermaid_code.append(
+                                        f'    Note over {admin_name}: {attr_name}'
+                                    )
 
                         elif isinstance(item, ast.FunctionDef):
                             # Adiciona a chamada do método
-                            mermaid_code.append(f"    User->>+{admin_name}: {item.name}()")
+                            mermaid_code.append(
+                                f'    User->>+{admin_name}: {item.name}()'
+                            )
 
                             # Analisa o corpo do método
-                            self._analyze_sequence_body(item.body, admin_name, mermaid_code)
+                            self._analyze_sequence_body(
+                                item.body, admin_name, mermaid_code
+                            )
 
                             # Simula interação com banco de dados
-                            mermaid_code.append(f"    {admin_name}->>+Database: query")
-                            mermaid_code.append(f"    Database-->>-{admin_name}: data")
+                            mermaid_code.append(f'    {admin_name}->>+Database: query')
+                            mermaid_code.append(f'    Database-->>-{admin_name}: data')
 
                             # Fecha a chamada do método
-                            mermaid_code.append(f"    {admin_name}-->>-User: response")
+                            mermaid_code.append(f'    {admin_name}-->>-User: response')
 
-        self.save_mermaid_diagram(mermaid_code, f"{app_name}_admin")
+        self.save_mermaid_diagram(mermaid_code, f'{app_name}_admin')
 
-    def generate_tasks_diagram(self, filename: str, app_name: str):
-        """Gera diagrama de sequência Mermaid para tasks Celery."""
-        tree = self.parse_file(filename)
+        self.save_mermaid_diagram(mermaid_code, f'{app_name}_admin')
 
-        mermaid_code = ["sequenceDiagram"]
+        self.save_mermaid_diagram(mermaid_code, f'{app_name}_admin')
+
+        self.save_mermaid_diagram(mermaid_code, f'{app_name}_admin')
+
+        mermaid_code = ['sequenceDiagram']
 
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 # Procura por decoradores @task
                 for decorator in node.decorator_list:
                     if isinstance(decorator, ast.Call):
-                        if isinstance(decorator.func, ast.Name) and decorator.func.id == 'task':
+                        if (
+                            isinstance(decorator.func, ast.Name)
+                            and decorator.func.id == 'task'
+                        ):
                             task_name = node.name
 
                             # Adiciona participantes
-                            mermaid_code.append(f"    participant App")
-                            mermaid_code.append(f"    participant Celery")
-                            mermaid_code.append(f"    participant {task_name}")
+                            mermaid_code.append(f'    participant App')
+                            mermaid_code.append(f'    participant Celery')
+                            mermaid_code.append(f'    participant {task_name}')
 
                             # Adiciona docstring como nota se existir
                             if docstring := ast.get_docstring(node):
-                                mermaid_code.append(f"    Note over {task_name}: {docstring[:50]}...")
+                                mermaid_code.append(
+                                    f'    Note over {task_name}: {docstring[:50]}...'
+                                )
 
                             # Simula o fluxo da task
-                            mermaid_code.append(f"    App->>+Celery: {task_name}.delay()")
-                            mermaid_code.append(f"    Celery->>+{task_name}: execute")
+                            mermaid_code.append(
+                                f'    App->>+Celery: {task_name}.delay()'
+                            )
+                            mermaid_code.append(f'    Celery->>+{task_name}: execute')
 
                             # Analisa o corpo da task
                             for stmt in node.body:
                                 if not isinstance(stmt, ast.Expr):  # Pula a docstring
-                                    self._analyze_sequence_body([stmt], task_name, mermaid_code)
+                                    self._analyze_sequence_body(
+                                        [stmt], task_name, mermaid_code
+                                    )
 
                             # Fecha o fluxo da task
-                            mermaid_code.append(f"    {task_name}-->>-Celery: result")
-                            mermaid_code.append("    Celery-->>-App: task_id")
+                            mermaid_code.append(f'    {task_name}-->>-Celery: result')
+                            mermaid_code.append('    Celery-->>-App: task_id')
 
-        self.save_mermaid_diagram(mermaid_code, f"{app_name}_tasks")
+        self.save_mermaid_diagram(mermaid_code, f'{app_name}_tasks')
 
     def save_mermaid_diagram(self, mermaid_code: List[str], filename: str):
         """Salva o diagrama Mermaid em um arquivo."""
         output_dir = 'docs/mermaid/sequence'
         os.makedirs(output_dir, exist_ok=True)
 
-        with open(f"{output_dir}/{filename}.mmd", 'w') as f:
+        with open(f'{output_dir}/{filename}.mmd', 'w') as f:
             f.write('\n'.join(mermaid_code))
 
-        self.stdout.write(self.style.SUCCESS(f'Diagrama Mermaid gerado com sucesso: {filename}.mmd'))
+        self.stdout.write(
+            self.style.SUCCESS(f'Diagrama Mermaid gerado com sucesso: {filename}.mmd')
+        )
