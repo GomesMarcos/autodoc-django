@@ -166,3 +166,4 @@ cython_debug/
 
 # command returns
 *.mmd
+docs/mermaid
