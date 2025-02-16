@@ -9,33 +9,33 @@ from autodoc.utils import AutodocCommandUtils
 
 
 class Command(AutodocCommandUtils):
-    help = 'Gera documentação automática em formato MermaidJS para views, admins e tasks Celery de apps Django'
+    help = 'Generates automatic documentation in MermaidJS format for Django apps views, admins, and Celery tasks'
 
     def add_arguments(self, parser):
         parser.add_argument(
             'app_names',
             nargs='+',
             type=str,
-            help='Nome dos apps Django para documentar',
+            help='Names of the Django apps to document',
         )
 
     def handle(self, *args, **options):
         for app_name in options['app_names']:
             if app_name not in settings.INSTALLED_APPS:
-                raise CommandError(f'App "{app_name}" não está em INSTALLED_APPS')
+                raise CommandError(f'App "{app_name}" is not in INSTALLED_APPS')
 
             self.process_app(app_name)
 
     def process_app(self, app_name: str):
-        """Processa um app Django e gera documentação para seus componentes."""
+        """Processes a Django app and generates documentation for its components."""
         app_path = self.get_app_path(app_name)
 
-        # Arquivos a serem analisados
+        # Files to analyze
         views_file = os.path.join(app_path, 'views.py')
         admin_file = os.path.join(app_path, 'admin.py')
         tasks_file = os.path.join(app_path, 'tasks.py')
 
-        # Gera documentação se os arquivos existirem
+        # Generate documentation if files exist
         if os.path.exists(views_file):
             self.generate_views_diagram(views_file, app_name)
 
@@ -46,23 +46,23 @@ class Command(AutodocCommandUtils):
             self.generate_tasks_diagram(tasks_file, app_name)
 
     def get_app_path(self, app_name: str) -> str:
-        """Retorna o caminho do app Django."""
+        """Returns the path of the Django app."""
         module = __import__(app_name)
         return os.path.dirname(module.__file__)
 
     def parse_file(self, filename: str) -> ast.AST:
-        """Faz o parse de um arquivo Python."""
+        """Parses a Python file."""
         with open(filename, 'r') as f:
             return ast.parse(f.read())
 
     def generate_views_diagram(self, filename: str, app_name: str):
-        """Gera diagrama de sequência Mermaid para views."""
+        """Generates Mermaid sequence diagram for views."""
         tree = self.parse_file(filename)
 
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
                 mermaid_code = ['```mermaid', 'sequenceDiagram']
-                # Identifica views baseadas em classes
+                # Identify class-based views
                 bases = [base.id for base in node.bases if isinstance(base, ast.Name)]
                 if any(base.endswith('View') for base in bases):
                     view_name = node.name
@@ -76,12 +76,12 @@ class Command(AutodocCommandUtils):
                                 f'    Client->>+{view_name}: {item.name}()'
                             )
 
-                            # Analisa o corpo do método
+                            # Analyze method body
                             self._analyze_sequence_body(
                                 item.body, view_name, mermaid_code
                             )
 
-                            # Fecha a chamada do método
+                            # Close the method call
                             mermaid_code.append(f'    {view_name}-->>-Client: response')
 
                 self.save_mermaid_diagram(mermaid_code, f'{app_name}_views_{node.name}')
@@ -89,7 +89,7 @@ class Command(AutodocCommandUtils):
     def _analyze_sequence_body(
         self, body, participant: str, mermaid_code: List[str], depth: int = 0
     ):
-        """Analisa o corpo de um método para o diagrama de sequência."""
+        """Analyzes the body of a method for the sequence diagram."""
         for stmt in body:
             if isinstance(stmt, ast.If):
                 condition = self._get_condition_text(stmt.test)
@@ -106,7 +106,7 @@ class Command(AutodocCommandUtils):
 
             elif isinstance(stmt, ast.Call):
                 target = self._get_call_target(stmt)
-                if target != participant:  # Evita mostrar chamadas internas
+                if target != participant:  # Avoids showing internal calls
                     mermaid_code.append(
                         f'    {participant}->>+{target}: {self._get_call_text(stmt)}'
                     )
@@ -119,7 +119,7 @@ class Command(AutodocCommandUtils):
                     )
 
     def _get_call_target(self, call) -> str:
-        """Extrai o alvo da chamada de função."""
+        """Extracts the target of the function call."""
         if isinstance(call.func, ast.Name):
             return call.func.id
         elif isinstance(call.func, ast.Attribute):
@@ -130,7 +130,7 @@ class Command(AutodocCommandUtils):
         return 'External'
 
     def _get_condition_text(self, test) -> str:
-        """Extrai o texto da condição."""
+        """Extracts the condition text."""
         if isinstance(test, ast.Compare):
             left = self._get_name(test.left)
             op = self._get_operator(test.ops[0])
@@ -144,7 +144,7 @@ class Command(AutodocCommandUtils):
         return 'condition'
 
     def _get_call_text(self, call) -> str:
-        """Extrai o texto da chamada de função."""
+        """Extracts the function call text."""
         if isinstance(call.func, ast.Name):
             return f'{call.func.id}()'
         elif isinstance(call.func, ast.Attribute):
@@ -152,7 +152,7 @@ class Command(AutodocCommandUtils):
         return 'function_call'
 
     def _get_name(self, node) -> str:
-        """Extrai o nome de um nó AST."""
+        """Extracts the name of an AST node."""
         if isinstance(node, ast.Name):
             return node.id
         elif isinstance(node, ast.Attribute):
@@ -163,7 +163,7 @@ class Command(AutodocCommandUtils):
         return str(node)
 
     def _get_return_text(self, ret) -> str:
-        """Extrai o texto do return."""
+        """Extracts the return text."""
         if isinstance(ret.value, ast.Name):
             return ret.value.id
         elif isinstance(ret.value, ast.Call):
@@ -171,11 +171,11 @@ class Command(AutodocCommandUtils):
         return ''
 
     def generate_admin_diagram(self, filename: str, app_name: str):
-        """Gera diagrama de sequência Mermaid para classes Admin."""
+        """Generates Mermaid sequence diagram for Admin classes."""
         tree = self.parse_file(filename)
 
     def generate_admin_diagram(self, filename: str, app_name: str):
-        """Gera diagrama de sequência Mermaid para classes Admin."""
+        """Generates Mermaid sequence diagram for Admin classes."""
         tree = self.parse_file(filename)
 
         mermaid_code = ['```mermaid', 'sequenceDiagram']
@@ -191,7 +191,7 @@ class Command(AutodocCommandUtils):
                         f'    participant {admin_name}',
                         '    participant Database',
                     )
-                    # Adiciona configurações do admin como notas
+                    # Add admin configurations as notes
                     for item in node.body:
                         if isinstance(item, ast.Assign):
                             if isinstance(item.targets[0], ast.Name):
@@ -206,21 +206,21 @@ class Command(AutodocCommandUtils):
                                     )
 
                         elif isinstance(item, ast.FunctionDef):
-                            # Adiciona a chamada do método
+                            # Adds the method call
                             mermaid_code.append(
                                 f'    User->>+{admin_name}: {item.name}()'
                             )
 
-                            # Analisa o corpo do método
+                            # Analyzes the method body
                             self._analyze_sequence_body(
                                 item.body, admin_name, mermaid_code
                             )
 
-                            # Simula interação com banco de dados
+                            # Simulates database interaction
                             mermaid_code.append(f'    {admin_name}->>+Database: query')
                             mermaid_code.append(f'    Database-->>-{admin_name}: data')
 
-                            # Fecha a chamada do método
+                            # Closes the method call
                             mermaid_code.append(f'    {admin_name}-->>-User: response')
 
         self.save_mermaid_diagram(mermaid_code, f'{app_name}_admin')
@@ -229,7 +229,7 @@ class Command(AutodocCommandUtils):
 
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
-                # Procura por decoradores @task
+                # Looks for @task decorators
                 for decorator in node.decorator_list:
                     if isinstance(decorator, ast.Call) and (
                         isinstance(decorator.func, ast.Name)
@@ -237,12 +237,12 @@ class Command(AutodocCommandUtils):
                     ):
                         task_name = node.name
 
-                        # Adiciona participantes
+                        # Add participants
                         mermaid_code.append(f'    participant App')
                         mermaid_code.append(f'    participant Celery')
                         mermaid_code.append(f'    participant {task_name}')
 
-                        # Adiciona docstring como nota se existir
+                        # Add docstring as note if it exists
                         if docstring := ast.get_docstring(node):
                             mermaid_code.append(
                                 f'    Note over {task_name}: {docstring[:50]}...'
@@ -254,9 +254,9 @@ class Command(AutodocCommandUtils):
                                 f'    Celery->>+{task_name}: execute',
                             )
                         )
-                        # Analisa o corpo da task
+                        # Analyze task body
                         for stmt in node.body:
-                            if not isinstance(stmt, ast.Expr):  # Pula a docstring
+                            if not isinstance(stmt, ast.Expr):  # Skip docstring
                                 self._analyze_sequence_body(
                                     [stmt], task_name, mermaid_code
                                 )

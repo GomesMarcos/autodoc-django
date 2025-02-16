@@ -8,30 +8,30 @@ from autodoc.utils import AutodocCommandUtils
 
 
 class Command(AutodocCommandUtils):
-    help = 'Gera documentação automática em formato MermaidJS para views, admins e tasks Celery de apps Django'
+    help = 'Generates automatic documentation in MermaidJS format for Django apps views, admins, and Celery tasks'
 
     def add_arguments(self, parser):
         parser.add_argument(
             'app_names',
             nargs='+',
             type=str,
-            help='Nome dos apps Django para documentar',
+            help='Names of the Django apps to document',
         )
 
     def handle(self, *args, **options):
         for app_name in options['app_names']:
             if app_name not in settings.INSTALLED_APPS:
-                raise CommandError(f'App "{app_name}" não está em INSTALLED_APPS')
+                raise CommandError(f'App "{app_name}" is not in INSTALLED_APPS')
 
             self.process_app(app_name)
 
     def parse_file(self, filename: str) -> ast.AST:
-        """Faz o parse de um arquivo Python."""
+        """Parses a Python file."""
         with open(filename, 'r') as f:
             return ast.parse(f.read())
 
     def generate_views_diagram(self, filename: str, app_name: str):
-        """Gera diagrama Mermaid para views."""
+        """Generates a Mermaid diagram for views."""
         tree = self.parse_file(filename)
 
         mermaid_code = ['```mermaid', 'flowchart TD']
@@ -64,7 +64,7 @@ class Command(AutodocCommandUtils):
     def _analyze_statement(
         self, stmt, parent_id: str, mermaid_code: List[str], counter: int
     ) -> int:
-        """Analisa um statement e adiciona ao diagrama."""
+        """Analyzes a statement and adds it to the diagram."""
         if isinstance(stmt, ast.If):
             counter += 1
             if_id = f'if_{counter}'
@@ -105,16 +105,16 @@ class Command(AutodocCommandUtils):
         return counter
 
     def _handle_return_text(self, return_text: str) -> str:
-        """Formata o texto de retorno para o diagrama Mermaid.
+        """Formats the return text for the Mermaid diagram.
 
-        Adiciona parênteses duplos ao texto de retorno, exceto se já contiver parênteses.
+        Adds double parentheses to the return text, unless it already contains parentheses.
         """
         if '(' in return_text:
             return f'(("return {return_text}"))'
         return f'((return {return_text}))'
 
     def _get_condition_text(self, test) -> str:
-        """Extrai o texto da condição."""
+        """Extracts the condition text."""
         if isinstance(test, ast.Compare):
             left = self._get_name(test.left)
             op = self._get_operator(test.ops[0])
@@ -127,7 +127,7 @@ class Command(AutodocCommandUtils):
         return 'condition'
 
     def _get_call_text(self, call) -> str:
-        """Extrai o texto da chamada de função."""
+        """Extracts the function call text."""
         if isinstance(call.func, ast.Name):
             return f'{call.func.id}'
         elif isinstance(call.func, ast.Attribute):
@@ -135,7 +135,7 @@ class Command(AutodocCommandUtils):
         return 'function_call'
 
     def _get_return_text(self, ret) -> str:
-        """Extrai o texto do return."""
+        """Extracts the return text."""
         if isinstance(ret.value, ast.Name):
             return ret.value.id
         elif isinstance(ret.value, ast.Call):
@@ -143,7 +143,7 @@ class Command(AutodocCommandUtils):
         return ''
 
     def _get_name(self, node) -> str:
-        """Extrai o nome de um nó AST."""
+        """Extracts the name of an AST node."""
         if isinstance(node, ast.Name):
             return node.id
         elif isinstance(node, ast.Attribute):
@@ -154,7 +154,7 @@ class Command(AutodocCommandUtils):
         return str(node)
 
     def _get_operator(self, op) -> str:
-        """Converte operador AST para string."""
+        """Converts AST operator to string."""
         op_map = {
             ast.Eq: '==',
             ast.NotEq: '!=',
@@ -170,7 +170,7 @@ class Command(AutodocCommandUtils):
         return op_map.get(type(op), '?')
 
     def generate_admin_diagram(self, filename: str, app_name: str):
-        """Gera diagrama Mermaid para classes Admin."""
+        """Generates Mermaid diagram for Admin classes."""
         tree = self.parse_file(filename)
 
         mermaid_code = ['```mermaid', 'flowchart TD']
@@ -216,7 +216,7 @@ class Command(AutodocCommandUtils):
         )
 
     def generate_tasks_diagram(self, filename: str, app_name: str):
-        """Gera diagrama Mermaid para tasks Celery."""
+        """Generates Mermaid diagram for Celery tasks."""
         tree = self.parse_file(filename)
 
         mermaid_code = ['```mermaid', 'flowchart TD']
