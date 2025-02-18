@@ -5,7 +5,7 @@ with open('README.md', 'r', encoding='utf-8') as fh:
 
 setuptools.setup(
     name='autodoc-django',
-    version='0.1.0',
+    version='0.1.1',
     author='Marcos Gomes',
     author_email='gomes.marcosjf@gmail.com',
     description="Provide an automatic documentation for Django's Apps",
