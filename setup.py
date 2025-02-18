@@ -4,7 +4,7 @@ with open('README.md', 'r', encoding='utf-8') as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='Autodoc Django',
+    name='autodoc-django',
     version='0.1.0',
     author='Marcos Gomes',
     author_email='gomes.marcosjf@gmail.com',
